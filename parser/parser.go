@@ -37,8 +37,7 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 		go parsePdf(pdfCh, imgCh)
 	}
 
-	rawKeyWord, keyWordPattern := getKeyWordPattern()
-	logMain.Printf("Поиск ключевого слова %s", rawKeyWord)
+	_, keyWordPattern := getKeyWordPattern()
 
 	for range 30 {
 		go parseImg(imgCh, sucCh, keyWordPattern)
