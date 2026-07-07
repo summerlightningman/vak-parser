@@ -72,6 +72,14 @@ func (d *DbAdapter) AddSubscriber(chatID int64) error {
 	})
 }
 
+func (d *DbAdapter) RemoveSubscriber(chatID int64) error {
+	return d.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(bucketSubscribers))
+		key := []byte(strconv.FormatInt(chatID, 10))
+		return b.Delete(key)
+	})
+}
+
 func (d *DbAdapter) ListSubscribers() ([]int64, error) {
 	var ids []int64
 	err := d.db.View(func(tx *bolt.Tx) error {

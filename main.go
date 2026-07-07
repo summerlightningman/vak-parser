@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+
 	"vak-parser/bot"
 	"vak-parser/common"
 	"vak-parser/database"
 	"vak-parser/parser"
+	"vak-parser/scheduler"
 )
 
 func main() {
@@ -19,8 +21,10 @@ func main() {
 
 	botIn := make(chan common.BotMsg, 1)
 	botOut := make(chan common.BotMsg, 1)
-	go parser.Parse(botIn, botOut, db)
+	schedCh := make(chan struct{})
+	go parser.Parse(botIn, botOut, schedCh, db)
 	go bot.RunBot(botIn, botOut, db)
+	go scheduler.Scheduler(schedCh)
 
 	fmt.Scanln()
 }

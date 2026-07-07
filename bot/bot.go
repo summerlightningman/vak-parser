@@ -58,9 +58,22 @@ func RunBot(botIn <-chan common.BotMsg, botOut chan<- common.BotMsg, db *databas
 		return
 	}
 
+	b.RegisterHandler(tg.HandlerTypeMessageText, "/unsubscribe", tg.MatchTypeExact, unsubscribeHandler(db))
+
 	go botInListener(b, botIn, db)
 
 	b.Start(context.TODO())
+}
+
+func unsubscribeHandler(db *database.DbAdapter) tg.HandlerFunc {
+	return func(ctx context.Context, b *tg.Bot, update *models.Update) {
+		db.RemoveSubscriber(update.Message.Chat.ID)
+
+		b.SendMessage(ctx, &tg.SendMessageParams{
+			ChatID: update.Message.Chat.ID,
+			Text:   "Вы отписались от рассылки",
+		})
+	}
 }
 
 func handler(botOut chan<- common.BotMsg, db *database.DbAdapter) tg.HandlerFunc {

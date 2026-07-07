@@ -24,7 +24,7 @@ var (
 	logMain = log.New(os.Stderr, "[main] ", log.LstdFlags)
 )
 
-func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, db *database.DbAdapter) {
+func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-chan struct{},db *database.DbAdapter) {
 	dlCh := make(chan Result, 10)
 	pdfCh := make(chan ChannelPayload, 20)
 	imgCh := make(chan ChannelPayload, 30)
@@ -46,6 +46,11 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, db *database
 
 	for {
 		select {
+			case payload :=<-sucCh:
+				botIn <-common.BotMsg {
+					Type: common.BotMsgTypeSuccess,
+					SuccessPayload: payload,
+				}
 			case msg :=<-botOut:
 				if msg.Type == common.BotMsgTypeParse {
 					data, err := parsePage()
@@ -56,12 +61,14 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, db *database
 
 					parseResults(data, db, dlCh, sucCh)
 				}
-			case payload :=<-sucCh:
-				botIn <-common.BotMsg {
-					Type: common.BotMsgTypeSuccess,
-					SuccessPayload: payload,
+			case <-schedCh:
+				data, err := parsePage()
+				if err != nil {
+					logMain.Printf("ошибка загрузки страницы: %v", err)
+					continue
 				}
 
+				parseResults(data, db, dlCh, sucCh)
 		}
 	}
 
