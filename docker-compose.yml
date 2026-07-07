@@ -1,0 +1,14 @@
+services:
+  vak-parser:
+    build: .
+    container_name: vak-parser
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Europe/Moscow
+      DB_PATH: /data/vak.db
+    volumes:
+      - vak-data:/data
+
+volumes:
+  vak-data:

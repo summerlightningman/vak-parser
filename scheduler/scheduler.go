@@ -21,7 +21,7 @@ func Scheduler(schedCh chan<- struct{}) {
 		return
 	}
 
-	log := log.New(os.Stderr, "[scheduler]", log.LstdFlags)
+	log := log.New(os.Stderr, "[scheduler] ", log.LstdFlags)
 
 	for {
 		now := time.Now().In(tz)

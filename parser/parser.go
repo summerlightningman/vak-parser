@@ -32,7 +32,6 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 	dlCh := make(chan Result, 10)
 	pdfCh := make(chan ChannelPayload, 20)
 	imgCh := make(chan ChannelPayload, 30)
-	sucCh := make(chan common.SuccessPayload, 5)
 
 	for range 10 {
 		go downloadFile(dlCh, pdfCh)
@@ -44,7 +43,7 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 	_, keyWordPattern := getKeyWordPattern()
 
 	for range 30 {
-		go parseImg(imgCh, sucCh, keyWordPattern)
+		go parseImg(imgCh, botIn, keyWordPattern)
 	}
 
 	run := func() error {
@@ -60,17 +59,12 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 			return err
 		}
 
-		parseResults(data, db, dlCh, sucCh)
+		parseResults(data, db, dlCh, botIn)
 		return nil
 	}
 
 	for {
 		select {
-			case payload :=<-sucCh:
-				botIn <-common.BotMsg {
-					Type: common.BotMsgTypeSuccess,
-					SuccessPayload: payload,
-				}
 			case msg :=<-botOut:
 				if msg.Type == common.BotMsgTypeRunParse {
 					err := run()
@@ -88,7 +82,7 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 
 }
 
-func parseImg(imgCh chan ChannelPayload, sucCh chan common.SuccessPayload, keyPattern *regexp.Regexp) {
+func parseImg(imgCh chan ChannelPayload, botIn chan<- common.BotMsg, keyPattern *regexp.Regexp) {
 	for data := range imgCh {
 		logOCR.Printf("распознавание: %s", data.FilePath)
 
@@ -108,9 +102,12 @@ func parseImg(imgCh chan ChannelPayload, sucCh chan common.SuccessPayload, keyPa
 				pageNum = -1
 			}
 
-			sucCh <- common.SuccessPayload{
-				Url: data.Url,
-				Page: pageNum,
+			botIn <- common.BotMsg{
+				Type: common.BotMsgTypeSuccess,
+				SuccessPayload: common.SuccessPayload{
+					Url: data.Url,
+					Page: pageNum,
+				},
 			}
 			logOCR.Printf("ключевое слово найдено на странице %s %s", pageStr, data.Url)
 		}
@@ -217,7 +214,7 @@ func getKeyWordPattern() (string, *regexp.Regexp) {
 	return keyWord, regexp.MustCompile(fmt.Sprintf(`%s[^а-я]`, keyWord))
 }
 
-func parseResults(data Data, db *database.DbAdapter, dlCh chan Result, sucCh chan common.SuccessPayload) {
+func parseResults(data Data, db *database.DbAdapter, dlCh chan Result, botIn chan<- common.BotMsg) {
 	logMain.Printf("запуск пайплайна: %d результатов", len(data.Results))
 
 	rawKeyWord, _ := getKeyWordPattern()
@@ -235,11 +232,14 @@ func parseResults(data Data, db *database.DbAdapter, dlCh chan Result, sucCh cha
 		}
 
 		for _, keyword := range result.Keywords {
-			if strings.Contains(keyword.Name, rawKeyWord) {
+			if strings.Contains(strings.ToLower(keyword.Name), rawKeyWord) {
 				logOCR.Printf("ключевое слово найдено в тегах по урлу: %s", result.Files[0].Url)
-				sucCh<-common.SuccessPayload{
-					Url: result.Files[0].Url,
-					Page: -1,
+				botIn<-common.BotMsg{
+					Type: common.BotMsgTypeSuccess,
+					SuccessPayload: common.SuccessPayload {
+						Url: result.Files[0].Url,
+						Page: -1,
+					},
 				}
 			}
 		}
@@ -262,7 +262,7 @@ func parseResults(data Data, db *database.DbAdapter, dlCh chan Result, sucCh cha
 }
 
 func parsePage() (Data, error) {
-	const url = "https://vak.gisnauka.ru/api/news/news-list/?page=1&pageSize=10&type=8,14"
+	const url = "https://vak.gisnauka.ru/api/news/news-list/?page=1&pageSize=50&type=8,14"
 	logAPI.Printf("запрос: %s", url)
 
 	resp, err := http.Get(url)

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"vak-parser/bot"
 	"vak-parser/common"
@@ -12,7 +14,12 @@ import (
 )
 
 func main() {
-	db, err := database.Open("./.db")
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "./.db"
+	}
+
+	db, err := database.Open(dbPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ошибка БД: %v\n", err)
 		return
@@ -26,5 +33,7 @@ func main() {
 	go bot.RunBot(botIn, botOut, db)
 	go scheduler.Scheduler(schedCh)
 
-	fmt.Scanln()
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
 }
