@@ -12,8 +12,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"vak-parser/common"
 	"vak-parser/database"
+	"vak-parser/scheduler"
 )
 
 var (
@@ -23,6 +25,8 @@ var (
 	logOCR  = log.New(os.Stderr, "[ocr] ", log.LstdFlags)
 	logMain = log.New(os.Stderr, "[main] ", log.LstdFlags)
 )
+
+
 
 func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-chan struct{},db *database.DbAdapter) {
 	dlCh := make(chan Result, 10)
@@ -43,6 +47,23 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 		go parseImg(imgCh, sucCh, keyWordPattern)
 	}
 
+	run := func() error {
+		ranAtMsg := scheduler.GetRanAtMsg(time.Now())
+		logMain.Println(ranAtMsg)
+		botIn<-common.BotMsg{
+			Type: common.BotMsgTypeParseHasRanAt,
+		}
+
+		data, err := parsePage()
+		if err != nil {
+			logMain.Printf("ошибка загрузки страницы: %v", err)
+			return err
+		}
+
+		parseResults(data, db, dlCh, sucCh)
+		return nil
+	}
+
 	for {
 		select {
 			case payload :=<-sucCh:
@@ -51,23 +72,17 @@ func Parse(botIn chan<- common.BotMsg, botOut <-chan common.BotMsg, schedCh <-ch
 					SuccessPayload: payload,
 				}
 			case msg :=<-botOut:
-				if msg.Type == common.BotMsgTypeParse {
-					data, err := parsePage()
+				if msg.Type == common.BotMsgTypeRunParse {
+					err := run()
 					if err != nil {
-						logMain.Printf("ошибка загрузки страницы: %v", err)
 						continue
 					}
-
-					parseResults(data, db, dlCh, sucCh)
 				}
 			case <-schedCh:
-				data, err := parsePage()
+				err := run()
 				if err != nil {
-					logMain.Printf("ошибка загрузки страницы: %v", err)
 					continue
 				}
-
-				parseResults(data, db, dlCh, sucCh)
 		}
 	}
 

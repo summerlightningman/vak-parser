@@ -5,15 +5,12 @@ import (
 	"log"
 	"os"
 	"time"
+
+	"vak-parser/common"
 )
 
-var russianMonths = [...]string{
-	"января", "февраля", "марта", "апреля", "мая", "июня",
-	"июля", "августа", "сентября", "октября", "ноября", "декабря",
-}
-
 func formatRunTime(t time.Time) string {
-	return fmt.Sprintf("%d %s в %02d:%02d", t.Day(), russianMonths[t.Month()-1], t.Hour(), t.Minute())
+	return fmt.Sprintf("%d %s в %02d:%02d", t.Day(), common.RussianMonths[t.Month()-1], t.Hour(), t.Minute())
 }
 
 // Смотрим приказы в 9:30 и 13:45
@@ -57,4 +54,8 @@ func Scheduler(schedCh chan<- struct{}) {
 		})
 		time.Sleep(sub)
 	}
+}
+
+func GetRanAtMsg(dt time.Time) string {
+	return fmt.Sprintf("Запущено %d %s в %02d:%02d", dt.Day(), common.RussianMonths[dt.Month()-1], dt.Hour(), dt.Minute())
 }

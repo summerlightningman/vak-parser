@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"vak-parser/common"
 	"vak-parser/database"
+	"vak-parser/scheduler"
 
 	"github.com/go-telegram/bot"
 	tg "github.com/go-telegram/bot"
@@ -19,23 +21,40 @@ var logBot = log.New(os.Stderr, "[bot] ", log.LstdFlags)
 func botInListener(b *tg.Bot, botIn <-chan common.BotMsg, db *database.DbAdapter) {
 	for msg := range botIn {
 		switch msg.Type {
-		case common.BotMsgTypeSuccess:
-			subscribers, err := db.ListSubscribers()
-			if err != nil {
-				logBot.Printf("ошибка чтения подписчиков: %v", err)
-				continue
-			}
-
-			text := formatSuccessMessage(msg.SuccessPayload)
-			for _, chatID := range subscribers {
-				_, err := b.SendMessage(context.Background(), &tg.SendMessageParams{
-					ChatID: chatID,
-					Text:   text,
-				})
+			case common.BotMsgTypeSuccess:
+				subscribers, err := db.ListSubscribers()
 				if err != nil {
-					logBot.Printf("ошибка отправки в chat %d: %v", chatID, err)
+					logBot.Printf("ошибка чтения подписчиков: %v", err)
+					continue
 				}
-			}
+
+				text := formatSuccessMessage(msg.SuccessPayload)
+				for _, chatID := range subscribers {
+					_, err := b.SendMessage(context.Background(), &tg.SendMessageParams{
+						ChatID: chatID,
+						Text:   text,
+					})
+					if err != nil {
+						logBot.Printf("ошибка отправки в chat %d: %v", chatID, err)
+					}
+				}
+			case common.BotMsgTypeParseHasRanAt:
+				subscribers, err := db.ListSubscribers()
+				if err != nil {
+					logBot.Printf("ошибка чтения подписчиков: %v", err)
+					continue
+				}
+
+				text := scheduler.GetRanAtMsg(time.Now())
+				for _, chatID := range subscribers {
+					_, err := b.SendMessage(context.Background(), &tg.SendMessageParams{
+						ChatID: chatID,
+						Text:   text,
+					})
+					if err != nil {
+						logBot.Printf("ошибка отправки в chat %d: %v", chatID, err)
+					}
+				}
 		}
 	}
 }
@@ -87,7 +106,7 @@ func handler(botOut chan<- common.BotMsg, db *database.DbAdapter) tg.HandlerFunc
 		}
 
 		botOut <- common.BotMsg{
-			Type: common.BotMsgTypeParse,
+			Type: common.BotMsgTypeRunParse,
 		}
 		logBot.Println("получено сообщение о парсинге")
 	}

@@ -3,8 +3,9 @@ package common
 type BotMsgType int
 
 const (
-	BotMsgTypeParse BotMsgType = iota
+	BotMsgTypeRunParse BotMsgType = iota
 	BotMsgTypeSuccess
+	BotMsgTypeParseHasRanAt
 )
 
 type SuccessPayload struct {
@@ -15,4 +16,5 @@ type SuccessPayload struct {
 type BotMsg struct {
 	Type BotMsgType
 	SuccessPayload SuccessPayload
+	Text string
 }
